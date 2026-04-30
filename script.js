@@ -1,5 +1,4 @@
-
-    (function(){
+(function(){
     // ==================== PERSISTENT STORAGE & ACCOUNT SYSTEM ====================
     let loggedIn = false;
     let accountUsername = "";
@@ -3979,6 +3978,7 @@
         { type: 'img', src: 'https://raw.githubusercontent.com/krisxxxllkrisipurvanov-cpu/Windows-Server-2026/main/Windows_Clock_icon.webp', label: 'Clock', action: () => openClockApp(), id: 'clockAppBtn' },
         { type: 'img', src: 'https://raw.githubusercontent.com/krisxxxllkrisipurvanov-cpu/Windows-Server-2026/main/deqmb2f-c96c5c1d-07e8-47b6-a49f-6b99f1d28c46.png', label: 'Run', action: () => openRunDialog(), id: 'runBtn' },
         { type: 'img', src: 'https://raw.githubusercontent.com/krisxxxllkrisipurvanov-cpu/Windows-Server-2026/main/Microsoft_Account_Logo.svg.png', label: 'Account', action: () => openMicrosoftAccountUI() },
+        { type: 'emoji', icon: '✂️', label: 'Snipping Tool', action: () => openSnippingTool(), id: 'snippingToolBtn' },
     ];
 
     function buildStartMenuGrid() {
@@ -4406,8 +4406,275 @@
             }
         }, 5200);
     }
+    // ==================== SNIPPING TOOL ====================
+    function openSnippingTool() {
+        if (openWindows.has('snippingTool')) {
+            const _w = openWindows.get('snippingTool').windowElement;
+            _w.style.display = 'flex'; _w.style.zIndex = Date.now(); return;
+        }
+        const html = `
+        <div style="display:flex;flex-direction:column;height:100%;background:#f3f3f3;font-family:'Segoe UI',sans-serif;">
+            <div style="background:#fff;border-bottom:1px solid #ddd;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+                <button id="snipNewBtn" style="background:#0078d4;color:white;border:none;padding:7px 16px;border-radius:4px;cursor:pointer;font-size:13px;font-family:'Segoe UI',sans-serif;display:flex;align-items:center;gap:6px;">
+                    ✂️ New Snip
+                </button>
+                <button id="snipCopyBtn" style="background:#f0f0f0;border:1px solid #ccc;padding:7px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-family:'Segoe UI',sans-serif;" disabled>📋 Copy</button>
+                <button id="snipSaveBtn" style="background:#f0f0f0;border:1px solid #ccc;padding:7px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-family:'Segoe UI',sans-serif;" disabled>💾 Save</button>
+                <div style="flex:1;"></div>
+                <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="snipTimerCheck"> 3s delay
+                </label>
+            </div>
+            <div id="snipToolbar" style="background:#fff;border-bottom:1px solid #ddd;padding:6px 12px;display:none;align-items:center;gap:8px;">
+                <span style="font-size:12px;color:#555;">Draw:</span>
+                <button class="snip-draw-btn active" data-tool="pen" style="padding:4px 10px;border:1px solid #0078d4;border-radius:4px;background:#e3f0ff;cursor:pointer;font-size:12px;">✏️ Pen</button>
+                <button class="snip-draw-btn" data-tool="highlight" style="padding:4px 10px;border:1px solid #ccc;border-radius:4px;background:#f0f0f0;cursor:pointer;font-size:12px;">🖍️ Highlight</button>
+                <button class="snip-draw-btn" data-tool="eraser" style="padding:4px 10px;border:1px solid #ccc;border-radius:4px;background:#f0f0f0;cursor:pointer;font-size:12px;">🧹 Eraser</button>
+                <input type="color" id="snipColorPick" value="#e00000" title="Color" style="width:30px;height:26px;border:none;cursor:pointer;border-radius:4px;">
+                <input type="range" id="snipBrushSize" min="1" max="20" value="3" style="width:80px;" title="Brush size">
+                <button id="snipClearDraw" style="padding:4px 10px;border:1px solid #ccc;border-radius:4px;background:#f0f0f0;cursor:pointer;font-size:12px;">🗑️ Clear</button>
+            </div>
+            <div id="snipCanvas" style="flex:1;display:flex;align-items:center;justify-content:center;background:#e8e8e8;position:relative;overflow:auto;">
+                <div id="snipPlaceholder" style="text-align:center;color:#888;pointer-events:none;user-select:none;">
+                    <div style="font-size:48px;margin-bottom:12px;">✂️</div>
+                    <div style="font-size:16px;font-weight:600;margin-bottom:6px;">Snipping Tool</div>
+                    <div style="font-size:13px;">Click <strong>New Snip</strong> to capture the desktop</div>
+                </div>
+                <canvas id="snipDrawCanvas" style="display:none;position:absolute;top:0;left:0;cursor:crosshair;"></canvas>
+                <img id="snipImg" style="display:none;max-width:100%;max-height:100%;box-shadow:0 2px 16px rgba(0,0,0,0.18);" alt="Snip">
+            </div>
+            <div id="snipStatus" style="background:#fff;border-top:1px solid #ddd;padding:4px 12px;font-size:11px;color:#888;">Ready</div>
+        </div>`;
+
+        const win = createWindow('Snipping Tool', html, 'snippingTool');
+        win.style.width = '700px'; win.style.height = '520px';
+        document.body.appendChild(win); win.style.zIndex = Date.now();
+
+        const newBtn = win.querySelector('#snipNewBtn');
+        const copyBtn = win.querySelector('#snipCopyBtn');
+        const saveBtn = win.querySelector('#snipSaveBtn');
+        const imgEl = win.querySelector('#snipImg');
+        const placeholder = win.querySelector('#snipPlaceholder');
+        const toolbar = win.querySelector('#snipToolbar');
+        const drawCanvas = win.querySelector('#snipDrawCanvas');
+        const status = win.querySelector('#snipStatus');
+        const timerCheck = win.querySelector('#snipTimerCheck');
+        let capturedDataURL = null;
+        let drawCtx = null;
+        let isDrawing = false;
+        let activeTool = 'pen';
+
+        function doCapture() {
+            // Hide the snipping tool window temporarily
+            win.style.visibility = 'hidden';
+            status.textContent = 'Capturing...';
+            setTimeout(() => {
+                // Use html2canvas if available, otherwise fake a screenshot
+                if (window.html2canvas) {
+                    html2canvas(document.getElementById('desktop'), { useCORS: true, allowTaint: true }).then(canvas => {
+                        capturedDataURL = canvas.toDataURL('image/png');
+                        showCapture();
+                    }).catch(() => fakeCapture());
+                } else {
+                    fakeCapture();
+                }
+            }, 150);
+        }
+
+        function fakeCapture() {
+            // Create a canvas with desktop color + "screenshot" look
+            const c = document.createElement('canvas');
+            c.width = window.innerWidth; c.height = window.innerHeight - taskbarHeight;
+            const ctx2 = c.getContext('2d');
+            ctx2.fillStyle = desktopBgColor || '#1b4d2e';
+            ctx2.fillRect(0, 0, c.width, c.height);
+            ctx2.fillStyle = 'rgba(255,255,255,0.08)';
+            ctx2.font = 'bold 32px Segoe UI';
+            ctx2.textAlign = 'center';
+            ctx2.fillText('📸 Screenshot captured!', c.width/2, c.height/2 - 20);
+            ctx2.font = '16px Segoe UI';
+            ctx2.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx2.fillText('(html2canvas not loaded — showing placeholder)', c.width/2, c.height/2 + 20);
+            // Draw any open windows as colored rectangles for a "real" feel
+            document.querySelectorAll('.app-window').forEach(w => {
+                const r = w.getBoundingClientRect();
+                ctx2.fillStyle = 'rgba(255,255,255,0.15)';
+                ctx2.fillRect(r.left, r.top, r.width, r.height);
+                ctx2.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx2.strokeRect(r.left, r.top, r.width, r.height);
+                const hdr = w.querySelector('.window-header');
+                if (hdr) {
+                    ctx2.fillStyle = accentColor || '#2c5a3e';
+                    ctx2.fillRect(r.left, r.top, r.width, 36);
+                    ctx2.fillStyle = 'white';
+                    ctx2.font = '13px Segoe UI';
+                    ctx2.textAlign = 'left';
+                    ctx2.fillText(hdr.querySelector('span')?.textContent || '', r.left + 12, r.top + 22);
+                }
+            });
+            capturedDataURL = c.toDataURL('image/png');
+            showCapture();
+        }
+
+        function showCapture() {
+            win.style.visibility = 'visible';
+            imgEl.src = capturedDataURL;
+            imgEl.style.display = 'block';
+            placeholder.style.display = 'none';
+            // Set up draw canvas on top of image
+            imgEl.onload = () => {
+                drawCanvas.width = imgEl.naturalWidth;
+                drawCanvas.height = imgEl.naturalHeight;
+                drawCanvas.style.width = imgEl.offsetWidth + 'px';
+                drawCanvas.style.height = imgEl.offsetHeight + 'px';
+                drawCanvas.style.display = 'block';
+                drawCtx = drawCanvas.getContext('2d');
+            };
+            toolbar.style.display = 'flex';
+            copyBtn.disabled = false; saveBtn.disabled = false;
+            status.textContent = 'Snip captured! You can draw on it.';
+            notify('Snipping Tool', 'Screenshot captured!', { icon: '✂️', kind: 'success' });
+        }
+
+        newBtn.onclick = () => {
+            const delay = timerCheck.checked ? 3000 : 0;
+            if (delay > 0) {
+                status.textContent = 'Capturing in 3 seconds...';
+                let count = 3;
+                const iv = setInterval(() => {
+                    count--;
+                    if (count <= 0) { clearInterval(iv); doCapture(); }
+                    else status.textContent = `Capturing in ${count} seconds...`;
+                }, 1000);
+            } else {
+                doCapture();
+            }
+        };
+
+        copyBtn.onclick = () => {
+            if (!capturedDataURL) return;
+            fetch(capturedDataURL).then(r=>r.blob()).then(blob => {
+                try {
+                    navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+                    notify('Snipping Tool', 'Image copied to clipboard!', {icon:'📋',kind:'success'});
+                } catch(e) {
+                    notify('Snipping Tool', 'Copy failed (browser security)', {icon:'⚠️',kind:'warn'});
+                }
+            });
+        };
+
+        saveBtn.onclick = () => {
+            if (!capturedDataURL) return;
+            // Merge draw layer with image
+            const c = document.createElement('canvas');
+            const img = new Image(); img.src = capturedDataURL;
+            img.onload = () => {
+                c.width = img.naturalWidth; c.height = img.naturalHeight;
+                const cx = c.getContext('2d');
+                cx.drawImage(img, 0, 0);
+                if (drawCtx) cx.drawImage(drawCanvas, 0, 0, img.naturalWidth, img.naturalHeight);
+                const a = document.createElement('a');
+                a.download = `snip_${Date.now()}.png`;
+                a.href = c.toDataURL('image/png');
+                a.click();
+                notify('Snipping Tool', 'Snip saved!', {icon:'💾',kind:'success'});
+            };
+        };
+
+        // Drawing tools
+        win.querySelectorAll('.snip-draw-btn').forEach(btn => {
+            btn.onclick = () => {
+                activeTool = btn.getAttribute('data-tool');
+                win.querySelectorAll('.snip-draw-btn').forEach(b => {
+                    b.style.background = '#f0f0f0'; b.style.borderColor = '#ccc';
+                });
+                btn.style.background = '#e3f0ff'; btn.style.borderColor = '#0078d4';
+            };
+        });
+
+        drawCanvas.addEventListener('mousedown', e => { isDrawing = true; });
+        drawCanvas.addEventListener('mouseup', e => { isDrawing = false; if(drawCtx) drawCtx.beginPath(); });
+        drawCanvas.addEventListener('mouseleave', e => { isDrawing = false; if(drawCtx) drawCtx.beginPath(); });
+        drawCanvas.addEventListener('mousemove', e => {
+            if (!isDrawing || !drawCtx) return;
+            const rect = drawCanvas.getBoundingClientRect();
+            const scaleX = drawCanvas.width / rect.width;
+            const scaleY = drawCanvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            const size = parseInt(win.querySelector('#snipBrushSize').value);
+            const color = win.querySelector('#snipColorPick').value;
+            if (activeTool === 'eraser') {
+                drawCtx.clearRect(x - size*2, y - size*2, size*4, size*4);
+            } else if (activeTool === 'highlight') {
+                drawCtx.globalAlpha = 0.35;
+                drawCtx.fillStyle = color;
+                drawCtx.fillRect(x - size, y - size/2, size*2, size);
+                drawCtx.globalAlpha = 1;
+            } else {
+                drawCtx.globalAlpha = 1;
+                drawCtx.fillStyle = color;
+                drawCtx.beginPath();
+                drawCtx.arc(x, y, size/2, 0, Math.PI*2);
+                drawCtx.fill();
+            }
+        });
+
+        win.querySelector('#snipClearDraw').onclick = () => {
+            if (drawCtx) drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        };
+    }
+
+    // ==================== DARK MODE ====================
+    let darkMode = false;
+    try { darkMode = JSON.parse(localStorage.getItem('win2026_darkMode') || 'false'); } catch(e) {}
+
+    function applyDarkMode(enabled) {
+        darkMode = enabled;
+        localStorage.setItem('win2026_darkMode', JSON.stringify(enabled));
+        const root = document.documentElement;
+        if (enabled) {
+            root.style.setProperty('--dm-bg', '#1a1a2e');
+            root.style.setProperty('--dm-win-bg', '#16213e');
+            root.style.setProperty('--dm-win-content', '#0f3460');
+            root.style.setProperty('--dm-text', '#e0e0e0');
+            root.style.setProperty('--dm-input-bg', '#1a2744');
+            root.style.setProperty('--dm-border', '#2d4a7a');
+            root.style.setProperty('--dm-hover', 'rgba(255,255,255,0.06)');
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+        // Update dark mode toggle button in taskbar if present
+        const dmBtn = document.getElementById('darkModeBtn');
+        if (dmBtn) dmBtn.title = enabled ? 'Light Mode' : 'Dark Mode';
+        notify('Appearance', enabled ? '🌙 Dark Mode enabled' : '☀️ Light Mode enabled', {kind:'success'});
+    }
+
+    // Apply dark mode on load
+    if (darkMode) applyDarkMode(true);
+
+    // Add dark mode button to taskbar tray
+    (function() {
+        const tray = document.querySelector('.tray-icons') || document.getElementById('trayVolume')?.parentElement;
+        if (!tray) return;
+        const btn = document.createElement('div');
+        btn.className = 'tray-icon'; btn.id = 'darkModeBtn';
+        btn.title = darkMode ? 'Light Mode' : 'Dark Mode';
+        btn.style.cssText = 'cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:4px;';
+        btn.innerHTML = `<svg id="dmIcon" width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+        </svg>`;
+        btn.onclick = (e) => { e.stopPropagation(); applyDarkMode(!darkMode); };
+        // Insert before volume icon
+        const volIcon = document.getElementById('trayVolume');
+        if (volIcon) tray.insertBefore(btn, volIcon);
+        else tray.appendChild(btn);
+    })();
+
     function launchApp(id) {
         if (id === 'clockApp') { openClockApp(); return; }
+        if (id === 'snippingTool') { openSnippingTool(); return; }
         if (id === 'animStudio') { openAnimationStudio(); return; }
         if(openWindows.has(id)) { const _w=openWindows.get(id).windowElement; _w.style.display='flex'; _w.style.zIndex=Date.now(); return; }
         if(id==='recycleBin'){ if(openWindows.has('recycleBin')) { const _rw=openWindows.get('recycleBin').windowElement; _rw.style.display='flex'; _rw.style.zIndex=Date.now(); } else { let win=createWindow('Recycle Bin','<div>Loading...</div>','recycleBin'); document.body.appendChild(win); win.style.zIndex=Date.now(); refreshRecycleBin(); } return; }
@@ -6168,6 +6435,7 @@
         const inField = e.target.matches('input, textarea, [contenteditable="true"]');
         if (e.ctrlKey && e.altKey && (e.key === 'Delete' || e.key === '.')) { e.preventDefault(); showSecurityScreen(); return; }
         if (e.ctrlKey && e.shiftKey && (e.key === 'Escape' || e.key === 'Esc')) { e.preventDefault(); openTaskManager(); return; }
+        if (e.shiftKey && e.key === 'S' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); openSnippingTool(); return; }
         if (e.metaKey || e.key === 'Meta' || e.key === 'OS') {
             // best-effort Win key combos
         }
@@ -7119,6 +7387,9 @@
                 menu.appendChild(makeItem({label:'Open in Terminal', icon:ICO.terminal, onClick:()=>{ try{ launchApp('cmd'); }catch(e){} }}));
                 menu.appendChild(makeItem({label:'Display settings', icon:ICO.display, onClick:()=>{ try{ openSettings(); }catch(e){} }}));
                 menu.appendChild(makeItem({label:'Personalize', icon:ICO.personalize, onClick:()=>{ try{ openSettings(); }catch(e){} }}));
+                menu.appendChild(makeSep());
+                menu.appendChild(makeItem({label: darkMode ? '☀️ Light Mode' : '🌙 Dark Mode', icon:'', onClick:()=>{ applyDarkMode(!darkMode); }}));
+                menu.appendChild(makeItem({label:'✂️ Snipping Tool', icon:'', onClick:()=>{ try{ openSnippingTool(); }catch(e){} }}));
 
                 // "Show more options" footer (Win11)
                 const sep = makeSep(); sep.classList.add('ctx-footer'); menu.appendChild(sep);
