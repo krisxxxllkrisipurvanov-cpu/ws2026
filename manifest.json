@@ -1,0 +1,22 @@
+{
+  "name": "Windows Server 2026",
+  "short_name": "WS2026",
+  "description": "Windows Server 2026 Desktop Simulator by KrisXxXLL",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0c0e14",
+  "theme_color": "#1b4d2e",
+  "icons": [
+    {
+      "src": "./WS2026_3.5_files/window.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./WS2026_3.5_files/window.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
